@@ -5,6 +5,77 @@ const GalleryImage = require('../models/GalleryImage');
 const { authenticateToken } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 
+// Upload new image (protected)
+router.post('/', authenticateToken, upload.single('image'), handleUploadError, async (req, res) => {
+  try {
+    console.log('Upload request received:', {
+      file: req.file,
+      body: req.body,
+      user: req.user?.username
+    });
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'לא הועלתה תמונה' });
+    }
+
+    const { description = '', category = 'general' } = req.body;
+
+    // בדיקה שהקובץ קיים
+    const filePath = req.file.path;
+    if (!fs.existsSync(filePath)) {
+      console.error('File not found after upload:', filePath);
+      return res.status(500).json({ message: 'שגיאה בשמירת הקובץ' });
+    }
+
+    const imageData = {
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      description: description.trim(),
+      category,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadedBy: req.user._id,
+      isVisible: true
+    };
+
+    console.log('Creating image record:', imageData);
+
+    const galleryImage = new GalleryImage(imageData);
+    await galleryImage.save();
+    
+    await galleryImage.populate('uploadedBy', 'username');
+
+    console.log('Image saved successfully:', galleryImage._id);
+
+    res.status(201).json({
+      message: 'תמונה הועלתה בהצלחה',
+      image: galleryImage
+    });
+
+  } catch (error) {
+    console.error('Upload image error:', error);
+    
+    // מחיקת הקובץ אם נכשל השמירה בבסיס הנתונים
+    if (req.file && req.file.path) {
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+          console.log('Deleted file after database error:', req.file.path);
+        }
+      } catch (fileError) {
+        console.error('Error deleting file:', fileError);
+      }
+    }
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ message: messages.join(', ') });
+    }
+
+    res.status(500).json({ message: 'שגיאה בהעלאת התמונה' });
+  }
+});
+
 // Get all images for admin (protected)
 router.get('/admin/all', authenticateToken, async (req, res) => {
   try {
@@ -22,6 +93,15 @@ router.get('/admin/all', authenticateToken, async (req, res) => {
     // Filter by visibility
     if (req.query.visible !== undefined) {
       query.isVisible = req.query.visible === 'true';
+    }
+
+    // Search functionality
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search.trim(), 'i');
+      query.$or = [
+        { originalName: searchRegex },
+        { description: searchRegex }
+      ];
     }
 
     const images = await GalleryImage
@@ -52,7 +132,7 @@ router.get('/admin/all', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Get admin gallery images error:', error);
-    res.status(500).json({ message: 'Error loading gallery images' });
+    res.status(500).json({ message: 'שגיאה בטעינת תמונות הגלריה' });
   }
 });
 
@@ -93,7 +173,7 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Get gallery stats error:', error);
-    res.status(500).json({ message: 'Error get gallery stats' });
+    res.status(500).json({ message: 'שגיאה בקבלת סטטיסטיקות גלריה' });
   }
 });
 
@@ -103,7 +183,7 @@ router.post('/bulk', authenticateToken, async (req, res) => {
     const { action, imageIds } = req.body;
 
     if (!action || !imageIds || !Array.isArray(imageIds)) {
-      return res.status(400).json({ message: 'Action and image ID are required' });
+      return res.status(400).json({ message: 'פעולה ומזהי תמונות נדרשים' });
     }
 
     let result;
@@ -142,17 +222,17 @@ router.post('/bulk', authenticateToken, async (req, res) => {
         break;
 
       default:
-        return res.status(400).json({ message: 'Unsupported operation' });
+        return res.status(400).json({ message: 'פעולה לא נתמכת' });
     }
 
     res.json({
-      message: `Operation '${action}' completed successfully`,
+      message: `פעולה '${action}' הושלמה בהצלחה`,
       affectedCount: result.modifiedCount || result.deletedCount
     });
 
   } catch (error) {
     console.error('Bulk operation error:', error);
-    res.status(500).json({ message: 'Error bulk operation' });
+    res.status(500).json({ message: 'שגיאה בפעולה קבוצתית' });
   }
 });
 
@@ -191,7 +271,7 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Get gallery images error:', error);
-    res.status(500).json({ message: 'Error loading gallery'});
+    res.status(500).json({ message: 'שגיאה בטעינת הגלריה'});
   }
 });
 
@@ -203,7 +283,7 @@ router.get('/:id', async (req, res) => {
       .populate('uploadedBy', 'username');
     
     if (!image || !image.isVisible) {
-      return res.status(404).json({ message: 'Image not found' });
+      return res.status(404).json({ message: 'תמונה לא נמצאה' });
     }
 
     res.json(image);
@@ -212,59 +292,10 @@ router.get('/:id', async (req, res) => {
     console.error('Get gallery image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Incorrect image ID' });
+      return res.status(400).json({ message: 'מזהה תמונה לא תקין' });
     }
     
-    res.status(500).json({ message: 'Error loading image' });
-  }
-});
-
-// Upload new image (protected)
-router.post('/', authenticateToken, upload.single('image'), handleUploadError, async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No image uploaded' });
-    }
-
-    const { description, category = 'general' } = req.body;
-
-    const imageData = {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      description: description || '',
-      category,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
-      uploadedBy: req.user._id
-    };
-
-    const galleryImage = new GalleryImage(imageData);
-    await galleryImage.save();
-    
-    await galleryImage.populate('uploadedBy', 'username');
-
-    res.status(201).json({
-      message: 'Image uploaded successfully',
-      image: galleryImage
-    });
-
-  } catch (error) {
-    console.error('Upload image error:', error);
-    
-    // Delete uploaded file if database save failed
-    if (req.file) {
-      const filePath = req.file.path;
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ message: messages.join(', ') });
-    }
-
-    res.status(500).json({ message: 'Error uploading image' });
+    res.status(500).json({ message: 'שגיאה בטעינת התמונה' });
   }
 });
 
@@ -275,7 +306,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const image = await GalleryImage.findById(req.params.id);
     if (!image) {
-      return res.status(404).json({ message: 'Image not found' });
+      return res.status(404).json({ message: 'תמונה לא נמצאה' });
     }
 
     // Update fields
@@ -287,7 +318,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     await image.populate('uploadedBy', 'username');
 
     res.json({
-      message: 'Image details updated successfully',
+      message: 'פרטי התמונה עודכנו בהצלחה',
       image
     });
 
@@ -295,7 +326,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     console.error('Update image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Incorrect image ID' });
+      return res.status(400).json({ message: 'מזהה תמונה לא תקין' });
     }
     
     if (error.name === 'ValidationError') {
@@ -303,7 +334,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: messages.join(', ') });
     }
 
-    res.status(500).json({ message: 'Error updating image details' });
+    res.status(500).json({ message: 'שגיאה בעדכון פרטי התמונה' });
   }
 });
 
@@ -313,7 +344,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const image = await GalleryImage.findByIdAndDelete(req.params.id);
     
     if (!image) {
-      return res.status(404).json({ message: 'Image not found' });
+      return res.status(404).json({ message: 'תמונה לא נמצאה' });
     }
 
     // Delete physical file
@@ -321,22 +352,50 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);
+        console.log('Deleted file:', filePath);
       } catch (fileError) {
         console.error('Error deleting file:', fileError);
         // Continue with database deletion even if file deletion fails
       }
+    } else {
+      console.warn('File not found for deletion:', filePath);
     }
 
-    res.json({ message: 'Image deleted successfully' });
+    res.json({ message: 'תמונה נמחקה בהצלחה' });
 
   } catch (error) {
     console.error('Delete image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Incorrect image ID' });
+      return res.status(400).json({ message: 'מזהה תמונה לא תקין' });
     }
     
-    res.status(500).json({ message: 'Error deleting image' });
+    res.status(500).json({ message: 'שגיאה במחיקת התמונה' });
+  }
+});
+
+// Test endpoint for debugging uploads
+router.get('/debug/uploads', authenticateToken, async (req, res) => {
+  try {
+    const uploadsPath = path.join(__dirname, '../uploads');
+    const dbImages = await GalleryImage.find().select('filename originalName uploadedAt').limit(10);
+    
+    let filesOnDisk = [];
+    try {
+      filesOnDisk = fs.readdirSync(uploadsPath);
+    } catch (error) {
+      filesOnDisk = ['Error reading directory: ' + error.message];
+    }
+
+    res.json({
+      uploadsPath,
+      filesOnDisk: filesOnDisk.slice(0, 10),
+      dbImages,
+      totalFilesOnDisk: Array.isArray(filesOnDisk) ? filesOnDisk.length : 0,
+      totalDbImages: await GalleryImage.countDocuments()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
