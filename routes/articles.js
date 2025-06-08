@@ -3,42 +3,6 @@ const Article = require('../models/Articles');
 const { authenticateToken } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 
-// ✅ הוספת route לstats שחסר
-router.get('/stats/summary', authenticateToken, async (req, res) => {
-  try {
-    const [
-      totalArticles,
-      publishedArticles,
-      totalViews
-    ] = await Promise.all([
-      Article.countDocuments(),
-      Article.countDocuments({ isPublished: true }),
-      Article.aggregate([
-        { $group: { _id: null, totalViews: { $sum: '$views' } } }
-      ])
-    ]);
-
-    const popularArticles = await Article
-      .find({ isPublished: true })
-      .sort({ views: -1 })
-      .limit(5)
-      .select('title views createdAt');
-
-    res.json({
-      total: totalArticles,
-      published: publishedArticles,
-      drafts: totalArticles - publishedArticles,
-      totalViews: totalViews[0]?.totalViews || 0,
-      popularArticles
-    });
-
-  } catch (error) {
-    console.error('Get articles stats error:', error);
-    res.status(500).json({ message: 'Error loading statistics' });
-  }
-});
-
-// Get all articles for admin (protected)
 router.get('/admin/all', authenticateToken, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -83,6 +47,40 @@ router.get('/admin/all', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get admin articles error:', error);
     res.status(500).json({ message: 'Error loading articles' });
+  }
+});
+
+router.get('/stats/summary', authenticateToken, async (req, res) => {
+  try {
+    const [
+      totalArticles,
+      publishedArticles,
+      totalViews
+    ] = await Promise.all([
+      Article.countDocuments(),
+      Article.countDocuments({ isPublished: true }),
+      Article.aggregate([
+        { $group: { _id: null, totalViews: { $sum: '$views' } } }
+      ])
+    ]);
+
+    const popularArticles = await Article
+      .find({ isPublished: true })
+      .sort({ views: -1 })
+      .limit(5)
+      .select('title views createdAt');
+
+    res.json({
+      total: totalArticles,
+      published: publishedArticles,
+      drafts: totalArticles - publishedArticles,
+      totalViews: totalViews[0]?.totalViews || 0,
+      popularArticles
+    });
+
+  } catch (error) {
+    console.error('Get articles stats error:', error);
+    res.status(500).json({ message: 'Error loading statistics' });
   }
 });
 
@@ -200,7 +198,6 @@ router.post('/', authenticateToken, upload.single('image'), handleUploadError, a
     } catch (error) {
         console.error('Create article error:', error);
 
-        // ✅ תיקון - השתמש בmessages שנוצרו
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({ message: messages.join(', ') });

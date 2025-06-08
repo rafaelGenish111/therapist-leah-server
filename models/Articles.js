@@ -18,7 +18,8 @@ const ArticleSchema = new mongoose.Schema({
     },
     author: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+        ref: 'User',
+        required: true
     },
     isPublished: {
         type: Boolean,
@@ -43,7 +44,7 @@ const ArticleSchema = new mongoose.Schema({
 });
 
 ArticleSchema.index({ createdAt: -1 });
-ArticleSchema.index({ title: 'text', context: 'text' });
+ArticleSchema.index({ title: 'text', content: 'text' });
 
 ArticleSchema.pre('save', function (next) {
     if (this.isModified() && !this.isNew) {

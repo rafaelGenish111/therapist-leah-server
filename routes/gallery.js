@@ -52,7 +52,7 @@ router.get('/admin/all', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('Get admin gallery images error:', error);
-    res.status(500).json({ message: 'Error louding gallery images' });
+    res.status(500).json({ message: 'Error loading gallery images' });
   }
 });
 
@@ -142,11 +142,11 @@ router.post('/bulk', authenticateToken, async (req, res) => {
         break;
 
       default:
-        return res.status(400).json({ message: 'Unsuppored oparation' });
+        return res.status(400).json({ message: 'Unsupported operation' });
     }
 
     res.json({
-      message: `Operation '${action}' completed succssfully`,
+      message: `Operation '${action}' completed successfully`,
       affectedCount: result.modifiedCount || result.deletedCount
     });
 
@@ -212,7 +212,7 @@ router.get('/:id', async (req, res) => {
     console.error('Get gallery image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Uncorrect image ID' });
+      return res.status(400).json({ message: 'Incorrect image ID' });
     }
     
     res.status(500).json({ message: 'Error loading image' });
@@ -223,7 +223,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', authenticateToken, upload.single('image'), handleUploadError, async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: 'לא הועלתה תמונה' });
+      return res.status(400).json({ message: 'No image uploaded' });
     }
 
     const { description, category = 'general' } = req.body;
@@ -264,7 +264,7 @@ router.post('/', authenticateToken, upload.single('image'), handleUploadError, a
       return res.status(400).json({ message: messages.join(', ') });
     }
 
-    res.status(500).json({ message: 'Error uoloading image' });
+    res.status(500).json({ message: 'Error uploading image' });
   }
 });
 
@@ -295,7 +295,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     console.error('Update image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Uncorrect image ID' });
+      return res.status(400).json({ message: 'Incorrect image ID' });
     }
     
     if (error.name === 'ValidationError') {
@@ -327,13 +327,13 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    res.json({ message: 'Image deleted succssfully' });
+    res.json({ message: 'Image deleted successfully' });
 
   } catch (error) {
     console.error('Delete image error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Uncorrect image ID' });
+      return res.status(400).json({ message: 'Incorrect image ID' });
     }
     
     res.status(500).json({ message: 'Error deleting image' });

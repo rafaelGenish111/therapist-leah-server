@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const HealthDeclaration = require('../models/HealthDeclaration'); // ✅ שם קבוע
+const HealthDeclaration = require('../models/HealthDeclaration');
 const { authenticateToken } = require('../middleware/auth');
 
 // Get health declaration statistics (protected)
@@ -63,7 +63,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: 'Phone number is not correct' });
         }
 
-        // ✅ תיקון validation עם המבנה החדש
         if (healthConditions.surgeries?.hasSurgeries && !healthConditions.surgeries?.details?.trim()) {
             return res.status(400).json({ message: 'You must detail the surgeries you have undergone' });
         }
@@ -118,7 +117,6 @@ router.get('/', authenticateToken, async (req, res) => {
             ];
         }
 
-        // ✅ תיקון שגיאת ההקלדה
         if (req.query.fromDate || req.query.toDate) {
             query.createdAt = {};
             if (req.query.fromDate) {

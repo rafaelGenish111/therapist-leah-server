@@ -1,4 +1,3 @@
-// 1. תיקון models/HealthDeclaration.js
 const mongoose = require('mongoose');
 
 const healthDeclarationSchema = new mongoose.Schema({
@@ -54,7 +53,6 @@ const healthDeclarationSchema = new mongoose.Schema({
             type: Boolean,
             default: false
         },
-        // ✅ תיקון המבנה של surgeries
         surgeries: {
             hasSurgeries: {
                 type: Boolean,
@@ -74,7 +72,6 @@ const healthDeclarationSchema = new mongoose.Schema({
             type: Boolean,
             default: false
         },
-        // ✅ תיקון המבנה של otherMedicalIssues
         otherMedicalIssues: {
             hasOtherIssues: {
                 type: Boolean,
