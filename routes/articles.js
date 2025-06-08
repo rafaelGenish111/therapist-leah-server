@@ -3,6 +3,42 @@ const Article = require('../models/Articles');
 const { authenticateToken } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 
+// ✅ הוספת route לstats שחסר
+router.get('/stats/summary', authenticateToken, async (req, res) => {
+  try {
+    const [
+      totalArticles,
+      publishedArticles,
+      totalViews
+    ] = await Promise.all([
+      Article.countDocuments(),
+      Article.countDocuments({ isPublished: true }),
+      Article.aggregate([
+        { $group: { _id: null, totalViews: { $sum: '$views' } } }
+      ])
+    ]);
+
+    const popularArticles = await Article
+      .find({ isPublished: true })
+      .sort({ views: -1 })
+      .limit(5)
+      .select('title views createdAt');
+
+    res.json({
+      total: totalArticles,
+      published: publishedArticles,
+      drafts: totalArticles - publishedArticles,
+      totalViews: totalViews[0]?.totalViews || 0,
+      popularArticles
+    });
+
+  } catch (error) {
+    console.error('Get articles stats error:', error);
+    res.status(500).json({ message: 'Error loading statistics' });
+  }
+});
+
+// Get all articles for admin (protected)
 router.get('/admin/all', authenticateToken, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -50,40 +86,6 @@ router.get('/admin/all', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/stats/summary', authenticateToken, async (req, res) => {
-  try {
-    const [
-      totalArticles,
-      publishedArticles,
-      totalViews
-    ] = await Promise.all([
-      Article.countDocuments(),
-      Article.countDocuments({ isPublished: true }),
-      Article.aggregate([
-        { $group: { _id: null, totalViews: { $sum: '$views' } } }
-      ])
-    ]);
-
-    const popularArticles = await Article
-      .find({ isPublished: true })
-      .sort({ views: -1 })
-      .limit(5)
-      .select('title views createdAt');
-
-    res.json({
-      total: totalArticles,
-      published: publishedArticles,
-      drafts: totalArticles - publishedArticles,
-      totalViews: totalViews[0]?.totalViews || 0,
-      popularArticles
-    });
-
-  } catch (error) {
-    console.error('Get articles stats error:', error);
-    res.status(500).json({ message: 'Error loading statistics' });
-  }
-});
-
 // Get all published articles (public)
 router.get('/', async (req, res) => {
     try {
@@ -106,6 +108,7 @@ router.get('/', async (req, res) => {
             const tags = req.query.tags.split(',').map(tag => tag.trim());
             query.tags = { $in: tags };
         }
+        
         const articles = await Article
             .find(query)
             .populate('author', 'username')
@@ -148,10 +151,10 @@ router.get('/:id', async (req, res) => {
         res.json(article);
 
     } catch (error) {
-        console.error('Get articles error:', error);
+        console.error('Get article error:', error);
 
         if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Uncorrect article ID' });
+            return res.status(400).json({ message: 'Incorrect article ID' });
         }
 
         res.status(500).json({ message: 'Error loading article' });
@@ -197,10 +200,13 @@ router.post('/', authenticateToken, upload.single('image'), handleUploadError, a
     } catch (error) {
         console.error('Create article error:', error);
 
+        // ✅ תיקון - השתמש בmessages שנוצרו
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({ message: 'Error creating article' })
+            return res.status(400).json({ message: messages.join(', ') });
         }
+
+        res.status(500).json({ message: 'Error creating article' });
     }
 });
 
@@ -243,7 +249,7 @@ router.put('/:id', authenticateToken, upload.single('image'), handleUploadError,
         console.error('Update article error:', error);
 
         if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Uncorrect article ID' });
+            return res.status(400).json({ message: 'Incorrect article ID' });
         }
 
         if (error.name === 'ValidationError') {
@@ -272,12 +278,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     console.error('Delete article error:', error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ message: 'Uncorrect article ID' });
+      return res.status(400).json({ message: 'Incorrect article ID' });
     }
     
     res.status(500).json({ message: 'Error deleting article' });
   }
 });
-
 
 module.exports = router;

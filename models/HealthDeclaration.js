@@ -1,5 +1,5 @@
+// 1. תיקון models/HealthDeclaration.js
 const mongoose = require('mongoose');
-const { validate } = require('./User');
 
 const healthDeclarationSchema = new mongoose.Schema({
     fullName: {
@@ -54,9 +54,12 @@ const healthDeclarationSchema = new mongoose.Schema({
             type: Boolean,
             default: false
         },
+        // ✅ תיקון המבנה של surgeries
         surgeries: {
-            type: Boolean,
-            default: false,
+            hasSurgeries: {
+                type: Boolean,
+                default: false
+            },
             details: {
                 type: String,
                 default: '', 
@@ -71,9 +74,12 @@ const healthDeclarationSchema = new mongoose.Schema({
             type: Boolean,
             default: false
         },
+        // ✅ תיקון המבנה של otherMedicalIssues
         otherMedicalIssues: {
-            type: Boolean,
-            default: false,
+            hasOtherIssues: {
+                type: Boolean,
+                default: false
+            },
             details: {
                 type: String,
                 default: '',
@@ -104,7 +110,7 @@ const healthDeclarationSchema = new mongoose.Schema({
     }
 });
 
-healthDeclarationSchema.index({ createdAt: - 1 });
+healthDeclarationSchema.index({ createdAt: -1 });
 healthDeclarationSchema.index({ idNumber: 1, createdAt: -1 });
 
-module.exports = mongoose.model('healthDeclaration', healthDeclarationSchema);
+module.exports = mongoose.model('HealthDeclaration', healthDeclarationSchema);
