@@ -11,6 +11,7 @@ const authRoutes = require('./routes/auth');
 const healthDeclarationRoutes = require('./routes/healthDeclarations');
 const articleRoutes = require('./routes/articles');
 const galleryRoutes = require('./routes/gallery');
+const serviceRoute = require('./routes/services');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,6 +59,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/health-declarations', healthDeclarationRoutes);
 app.use('/api/articles', articleRoutes);
 app.use('/api/gallery', galleryRoutes);
+app.use('/api/services', serviceRoute);
 
 // Test route for uploads
 app.get('/api/test-upload', (req, res) => {
